@@ -253,6 +253,8 @@ export default function AppSettingsPage() {
                 onStartOAuth={apiSetupOnboarding.handleStartOAuth}
                 onFinish={handleApiSetupFinish}
                 isWaitingForCode={apiSetupOnboarding.isWaitingForCode}
+                oauthVariant={apiSetupOnboarding.state.apiSetupMethod === 'chatgpt_subscription' ? 'openai' : 'claude'}
+                openAIDeviceCodeInfo={apiSetupOnboarding.openAIDeviceCodeInfo}
                 onSubmitAuthCode={apiSetupOnboarding.handleSubmitAuthCode}
                 onCancelOAuth={apiSetupOnboarding.handleCancelOAuth}
                 className="h-full"

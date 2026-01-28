@@ -1,8 +1,8 @@
 import { cn } from "@/lib/utils"
-import { Check, CreditCard, Key } from "lucide-react"
+import { Check, CreditCard, Key, Sparkles } from "lucide-react"
 import { StepFormLayout, BackButton, ContinueButton } from "./primitives"
 
-export type ApiSetupMethod = 'api_key' | 'claude_oauth'
+export type ApiSetupMethod = 'chatgpt_subscription' | 'api_key' | 'claude_oauth'
 
 interface ApiSetupOption {
   id: ApiSetupMethod
@@ -14,16 +14,22 @@ interface ApiSetupOption {
 
 const API_SETUP_OPTIONS: ApiSetupOption[] = [
   {
+    id: 'chatgpt_subscription',
+    name: 'ChatGPT Plus/Pro',
+    description: 'Use OpenAI models via an Anthropic-compatible provider.',
+    icon: <Sparkles className="size-4" />,
+    recommended: true,
+  },
+  {
     id: 'claude_oauth',
     name: 'Claude Pro/Max',
     description: 'Use your Claude subscription for unlimited access.',
     icon: <CreditCard className="size-4" />,
-    recommended: true,
   },
   {
     id: 'api_key',
     name: 'API Key',
-    description: 'Anthropic, OpenRouter, Ollama, or compatible APIs.',
+    description: 'Anthropic, OpenRouter, Ollama, or other compatible APIs.',
     icon: <Key className="size-4" />,
   },
 ]
@@ -39,8 +45,9 @@ interface APISetupStepProps {
  * APISetupStep - Choose how to connect your AI agents
  *
  * Two options:
- * - Claude Pro/Max (recommended) - Uses Claude subscription
- * - API Key - Pay-as-you-go via Anthropic
+ * - ChatGPT Plus/Pro (recommended) - OpenAI models via compatible providers
+ * - Claude Pro/Max - Uses Claude subscription
+ * - API Key - Pay-as-you-go via Anthropic or compatible providers
  */
 export function APISetupStep({
   selectedMethod,

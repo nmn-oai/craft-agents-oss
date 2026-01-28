@@ -150,6 +150,7 @@ const api: ElectronAPI = {
   startWorkspaceMcpOAuth: (mcpUrl: string) => ipcRenderer.invoke(IPC_CHANNELS.ONBOARDING_START_MCP_OAUTH, mcpUrl),
   saveOnboardingConfig: (config: {
     authType?: AuthType
+    oauthProvider?: 'claude' | 'openai'
     workspace?: { name: string; iconUrl?: string; mcpUrl?: string }
     credential?: string
     mcpCredentials?: { accessToken: string; clientId?: string }
@@ -161,6 +162,11 @@ const api: ElectronAPI = {
   exchangeClaudeCode: (code: string) => ipcRenderer.invoke(IPC_CHANNELS.ONBOARDING_EXCHANGE_CLAUDE_CODE, code),
   hasClaudeOAuthState: () => ipcRenderer.invoke(IPC_CHANNELS.ONBOARDING_HAS_CLAUDE_OAUTH_STATE),
   clearClaudeOAuthState: () => ipcRenderer.invoke(IPC_CHANNELS.ONBOARDING_CLEAR_CLAUDE_OAUTH_STATE),
+  // OpenAI OAuth (device flow)
+  startOpenAIOAuth: () => ipcRenderer.invoke(IPC_CHANNELS.ONBOARDING_START_OPENAI_OAUTH),
+  completeOpenAIOAuth: () => ipcRenderer.invoke(IPC_CHANNELS.ONBOARDING_COMPLETE_OPENAI_OAUTH),
+  hasOpenAIOAuthState: () => ipcRenderer.invoke(IPC_CHANNELS.ONBOARDING_HAS_OPENAI_OAUTH_STATE),
+  clearOpenAIOAuthState: () => ipcRenderer.invoke(IPC_CHANNELS.ONBOARDING_CLEAR_OPENAI_OAUTH_STATE),
 
   // Settings - API Setup
   getApiSetup: () => ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_GET_API_SETUP),

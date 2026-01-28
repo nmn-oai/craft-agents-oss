@@ -1267,6 +1267,8 @@ export default function App() {
           onStartOAuth={onboarding.handleStartOAuth}
           onFinish={onboarding.handleFinish}
           isWaitingForCode={onboarding.isWaitingForCode}
+          oauthVariant={onboarding.state.apiSetupMethod === 'chatgpt_subscription' ? 'openai' : 'claude'}
+          openAIDeviceCodeInfo={onboarding.openAIDeviceCodeInfo}
           onSubmitAuthCode={onboarding.handleSubmitAuthCode}
           onCancelOAuth={onboarding.handleCancelOAuth}
           onBrowseGitBash={onboarding.handleBrowseGitBash}

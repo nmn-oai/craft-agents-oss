@@ -11,7 +11,16 @@ import { saveConfig, loadStoredConfig, generateWorkspaceId, type AuthType, type 
 import { getDefaultWorkspacesDir, generateUniqueWorkspacePath } from '@craft-agent/shared/workspaces'
 import { CraftOAuth, getMcpBaseUrl } from '@craft-agent/shared/auth'
 import { validateMcpConnection } from '@craft-agent/shared/mcp'
-import { startClaudeOAuth, exchangeClaudeCode, hasValidOAuthState, clearOAuthState } from '@craft-agent/shared/auth'
+import {
+  startClaudeOAuth,
+  exchangeClaudeCode,
+  hasValidOAuthState,
+  clearOAuthState,
+  startOpenAIOAuth,
+  completeOpenAIOAuth,
+  hasValidOpenAIOAuthState,
+  clearOpenAIOAuthState,
+} from '@craft-agent/shared/auth'
 import { getCredentialManager as getCredentialManagerFn } from '@craft-agent/shared/credentials'
 import {
   IPC_CHANNELS,
@@ -138,6 +147,19 @@ export function registerOnboardingHandlers(sessionManager: SessionManager): void
       if (config.authType) {
         mainLog.info('[Onboarding:Main] Updating authType from', newConfig.authType, 'to', config.authType)
         newConfig.authType = config.authType
+        // Clear oauth provider when switching to API key auth
+        if (config.authType === 'api_key') {
+          delete newConfig.oauthProvider
+        }
+      }
+
+      // 3b. Update oauthProvider if provided
+      if (config.oauthProvider && newConfig.authType === 'oauth_token') {
+        mainLog.info('[Onboarding:Main] Setting oauthProvider to', config.oauthProvider)
+        newConfig.oauthProvider = config.oauthProvider
+      } else if (newConfig.authType === 'oauth_token' && !newConfig.oauthProvider) {
+        // Default to Claude OAuth when provider is not specified
+        newConfig.oauthProvider = 'claude'
       }
 
       // 3a. Update anthropicBaseUrl if provided
@@ -307,6 +329,78 @@ export function registerOnboardingHandlers(sessionManager: SessionManager): void
   // Clear OAuth state (for cancel/reset)
   ipcMain.handle(IPC_CHANNELS.ONBOARDING_CLEAR_CLAUDE_OAUTH_STATE, async () => {
     clearOAuthState()
+    return { success: true }
+  })
+
+  // Start OpenAI OAuth device flow
+  ipcMain.handle(IPC_CHANNELS.ONBOARDING_START_OPENAI_OAUTH, async () => {
+    try {
+      mainLog.info('[Onboarding] Starting OpenAI OAuth device flow...')
+
+      const result = await startOpenAIOAuth((status) => {
+        mainLog.info('[Onboarding] OpenAI OAuth status:', status)
+      })
+
+      mainLog.info('[Onboarding] OpenAI OAuth started')
+      return { success: true, verificationUrl: result.verificationUrl, userCode: result.userCode }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error'
+      mainLog.error('[Onboarding] Start OpenAI OAuth error:', message)
+      return { success: false, error: message }
+    }
+  })
+
+  // Complete OpenAI OAuth by polling for a token
+  ipcMain.handle(IPC_CHANNELS.ONBOARDING_COMPLETE_OPENAI_OAUTH, async () => {
+    try {
+      mainLog.info('[Onboarding] Completing OpenAI OAuth...')
+
+      if (!hasValidOpenAIOAuthState()) {
+        mainLog.error('[Onboarding] No valid OpenAI OAuth state found')
+        return { success: false, error: 'OAuth session expired. Please start again.' }
+      }
+
+      const tokens = await completeOpenAIOAuth((status) => {
+        mainLog.info('[Onboarding] OpenAI OAuth status:', status)
+      })
+
+      const manager = getCredentialManagerFn()
+      await manager.setOpenAIOAuth(tokens.accessToken)
+
+      // Persist auth selection so session manager can choose the right token
+      const existingConfig = loadStoredConfig()
+      const newConfig: StoredConfig = existingConfig || {
+        authType: 'oauth_token',
+        oauthProvider: 'openai',
+        workspaces: [],
+        activeWorkspaceId: null,
+        activeSessionId: null,
+      }
+      newConfig.authType = 'oauth_token'
+      newConfig.oauthProvider = 'openai'
+      saveConfig(newConfig)
+
+      try {
+        await sessionManager.reinitializeAuth()
+      } catch (authError) {
+        mainLog.error('[Onboarding] Failed to reinitialize auth after OpenAI OAuth:', authError)
+      }
+
+      mainLog.info('[Onboarding] OpenAI OAuth successful')
+      return { success: true, token: tokens.accessToken }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error'
+      mainLog.error('[Onboarding] Complete OpenAI OAuth error:', message)
+      return { success: false, error: message }
+    }
+  })
+
+  ipcMain.handle(IPC_CHANNELS.ONBOARDING_HAS_OPENAI_OAUTH_STATE, async () => {
+    return hasValidOpenAIOAuthState()
+  })
+
+  ipcMain.handle(IPC_CHANNELS.ONBOARDING_CLEAR_OPENAI_OAUTH_STATE, async () => {
+    clearOpenAIOAuthState()
     return { success: true }
   })
 }

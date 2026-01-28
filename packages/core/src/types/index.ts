@@ -7,6 +7,7 @@ export type {
   Workspace,
   McpAuthType,
   AuthType,
+  OAuthProvider,
   OAuthCredentials,
   StoredConfig,
 } from './workspace.ts';
@@ -42,4 +43,3 @@ export type {
   AuthStatus,
 } from './message.ts';
 export { generateMessageId } from './message.ts';
-

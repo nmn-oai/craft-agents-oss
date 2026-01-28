@@ -44,6 +44,8 @@ interface OnboardingWizardProps {
   isWaitingForCode?: boolean
   onSubmitAuthCode?: (code: string) => void
   onCancelOAuth?: () => void
+  oauthVariant?: 'claude' | 'openai'
+  openAIDeviceCodeInfo?: { verificationUrl: string; userCode: string } | null
 
   // Git Bash (Windows)
   onBrowseGitBash?: () => Promise<string | null>
@@ -59,8 +61,8 @@ interface OnboardingWizardProps {
  *
  * Manages the step-by-step flow for setting up Craft Agent:
  * 1. Welcome
- * 2. API Setup (choose: API Key / Claude OAuth)
- * 3. Credentials (API Key or Claude OAuth)
+ * 2. API Setup (choose: ChatGPT / API Key / Claude OAuth)
+ * 3. Credentials (API key or OAuth)
  * 4. Completion
  */
 export function OnboardingWizard({
@@ -75,6 +77,8 @@ export function OnboardingWizard({
   isWaitingForCode,
   onSubmitAuthCode,
   onCancelOAuth,
+  oauthVariant,
+  openAIDeviceCodeInfo,
   // Git Bash (Windows)
   onBrowseGitBash,
   onUseGitBashPath,
@@ -125,6 +129,8 @@ export function OnboardingWizard({
             errorMessage={state.errorMessage}
             onSubmit={onSubmitCredential}
             onStartOAuth={onStartOAuth}
+            oauthVariant={oauthVariant}
+            openAIDeviceCodeInfo={openAIDeviceCodeInfo}
             onBack={onBack}
             isWaitingForCode={isWaitingForCode}
             onSubmitAuthCode={onSubmitAuthCode}

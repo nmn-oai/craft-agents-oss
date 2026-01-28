@@ -24,6 +24,8 @@ interface CredentialsStepProps {
   errorMessage?: string
   onSubmit: (data: ApiKeySubmitData) => void
   onStartOAuth?: () => void
+  oauthVariant?: 'claude' | 'openai'
+  openAIDeviceCodeInfo?: { verificationUrl: string; userCode: string } | null
   onBack: () => void
   // Two-step OAuth flow
   isWaitingForCode?: boolean
@@ -37,27 +39,38 @@ export function CredentialsStep({
   errorMessage,
   onSubmit,
   onStartOAuth,
+  oauthVariant = 'claude',
+  openAIDeviceCodeInfo,
   onBack,
   isWaitingForCode,
   onSubmitAuthCode,
   onCancelOAuth,
 }: CredentialsStepProps) {
-  const isOAuth = apiSetupMethod === 'claude_oauth'
+  const isClaudeOAuth = apiSetupMethod === 'claude_oauth'
+  const isOpenAIOAuth = apiSetupMethod === 'chatgpt_subscription'
+  const isOAuth = isClaudeOAuth || isOpenAIOAuth
 
   // --- OAuth flow ---
   if (isOAuth) {
+    const providerLabel = oauthVariant === 'openai' ? 'ChatGPT' : 'Claude'
+    const waitingTitle = oauthVariant === 'openai' ? 'Finish ChatGPT Login' : 'Enter Authorization Code'
+    const waitingDescription = oauthVariant === 'openai'
+      ? 'Complete login in your browser, then click Continue.'
+      : 'Copy the code from the browser page and paste it below.'
+
     // Waiting for authorization code entry
     if (isWaitingForCode) {
       return (
         <StepFormLayout
-          title="Enter Authorization Code"
-          description="Copy the code from the browser page and paste it below."
+          title={waitingTitle}
+          description={waitingDescription}
           actions={
             <>
               <BackButton onClick={onCancelOAuth} disabled={status === 'validating'}>Cancel</BackButton>
               <ContinueButton
                 type="submit"
-                form="auth-code-form"
+                form={oauthVariant === 'openai' ? undefined : 'auth-code-form'}
+                onClick={oauthVariant === 'openai' ? () => onSubmitAuthCode?.('') : undefined}
                 disabled={false}
                 loading={status === 'validating'}
                 loadingText="Connecting..."
@@ -69,6 +82,7 @@ export function CredentialsStep({
             status={status as OAuthStatus}
             errorMessage={errorMessage}
             isWaitingForCode={true}
+            deviceCodeInfo={oauthVariant === 'openai' ? openAIDeviceCodeInfo ?? null : null}
             onStartOAuth={onStartOAuth!}
             onSubmitAuthCode={onSubmitAuthCode}
             onCancelOAuth={onCancelOAuth}
@@ -79,8 +93,12 @@ export function CredentialsStep({
 
     return (
       <StepFormLayout
-        title="Connect Claude Account"
-        description="Use your Claude subscription to power multi-agent workflows."
+        title={`Connect ${providerLabel} Account`}
+        description={
+          oauthVariant === 'openai'
+            ? 'Use your ChatGPT subscription to power multi-agent workflows.'
+            : 'Use your Claude subscription to power multi-agent workflows.'
+        }
         actions={
           <>
             <BackButton onClick={onBack} disabled={status === 'validating'} />
@@ -91,7 +109,7 @@ export function CredentialsStep({
               loadingText="Connecting..."
             >
               <ExternalLink className="size-4" />
-              Sign in with Claude
+              {oauthVariant === 'openai' ? 'Sign in with ChatGPT' : 'Sign in with Claude'}
             </ContinueButton>
           </>
         }
@@ -100,6 +118,7 @@ export function CredentialsStep({
           status={status as OAuthStatus}
           errorMessage={errorMessage}
           isWaitingForCode={false}
+          deviceCodeInfo={oauthVariant === 'openai' ? openAIDeviceCodeInfo ?? null : null}
           onStartOAuth={onStartOAuth!}
           onSubmitAuthCode={onSubmitAuthCode}
           onCancelOAuth={onCancelOAuth}
@@ -112,7 +131,9 @@ export function CredentialsStep({
   return (
     <StepFormLayout
       title="API Configuration"
-      description="Enter your API key. Optionally configure a custom endpoint for OpenRouter, Ollama, or compatible APIs."
+      description={
+        "Enter your API key. Optionally configure a custom endpoint for OpenRouter, Ollama, or compatible APIs."
+      }
       actions={
         <>
           <BackButton onClick={onBack} disabled={status === 'validating'} />

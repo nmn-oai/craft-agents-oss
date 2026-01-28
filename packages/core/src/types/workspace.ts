@@ -22,6 +22,14 @@ export interface Workspace {
 export type AuthType = 'api_key' | 'oauth_token';
 
 /**
+ * Which OAuth provider is being used when authType === 'oauth_token'.
+ *
+ * We currently support both Claude (Anthropic) and ChatGPT (OpenAI)
+ * subscription logins, and need to know which token to read.
+ */
+export type OAuthProvider = 'claude' | 'openai';
+
+/**
  * OAuth credentials from a fresh authentication flow.
  * Used for temporary state in UI components before saving to credential store.
  */
@@ -36,9 +44,10 @@ export interface OAuthCredentials {
 // Config stored in JSON file (credentials stored in encrypted file, not here)
 export interface StoredConfig {
   authType?: AuthType;
+  /** Which OAuth provider is active when authType === 'oauth_token' */
+  oauthProvider?: OAuthProvider;
   workspaces: Workspace[];
   activeWorkspaceId: string | null;
   activeSessionId: string | null;  // Currently active session (primary scope)
   model?: string;
 }
-

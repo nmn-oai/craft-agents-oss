@@ -5,7 +5,7 @@
  * No runtime dependencies - safe for browser bundling.
  */
 
-import type { AuthType, Workspace } from '../config/types.ts';
+import type { AuthType, OAuthProvider, Workspace } from '../config/types.ts';
 
 /**
  * Unified authentication state
@@ -15,12 +15,16 @@ export interface AuthState {
   billing: {
     /** Configured billing type, or null if not yet configured */
     type: AuthType | null;
+    /** Which OAuth provider is active when type === 'oauth_token' */
+    oauthProvider: OAuthProvider | null;
     /** True if we have the required credentials for the configured billing type */
     hasCredentials: boolean;
     /** Anthropic API key (if using api_key auth type) */
     apiKey: string | null;
     /** Claude Max OAuth token (if using oauth_token auth type) */
     claudeOAuthToken: string | null;
+    /** OpenAI OAuth token (if using oauth_token auth type with oauthProvider=openai) */
+    openaiOAuthToken: string | null;
   };
 
   /** Workspace/MCP configuration */
