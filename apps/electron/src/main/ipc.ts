@@ -11,7 +11,7 @@ import { WindowManager } from './window-manager'
 import { registerOnboardingHandlers } from './onboarding'
 import { IPC_CHANNELS, type FileAttachment, type StoredAttachment, type AuthType, type ApiSetupInfo, type SendMessageOptions } from '../shared/types'
 import { readFileAttachment, perf, validateImageForClaudeAPI, IMAGE_LIMITS } from '@craft-agent/shared/utils'
-import { getAuthType, setAuthType, getPreferencesPath, getCustomModel, setCustomModel, getModel, setModel, getSessionDraft, setSessionDraft, deleteSessionDraft, getAllSessionDrafts, getWorkspaceByNameOrId, addWorkspace, setActiveWorkspace, getAnthropicBaseUrl, setAnthropicBaseUrl, loadStoredConfig, saveConfig, type Workspace, SUMMARIZATION_MODEL } from '@craft-agent/shared/config'
+import { getAuthType, setAuthType, getOAuthProvider, setOAuthProvider, getPreferencesPath, getCustomModel, setCustomModel, getModel, setModel, getSessionDraft, setSessionDraft, deleteSessionDraft, getAllSessionDrafts, getWorkspaceByNameOrId, addWorkspace, setActiveWorkspace, getAnthropicBaseUrl, setAnthropicBaseUrl, loadStoredConfig, saveConfig, type Workspace, SUMMARIZATION_MODEL } from '@craft-agent/shared/config'
 import { getSessionAttachmentsPath } from '@craft-agent/shared/sessions'
 import { loadWorkspaceSources, getSourcesBySlugs, type LoadedSource } from '@craft-agent/shared/sources'
 import { isValidThinkingLevel } from '@craft-agent/shared/agent/thinking-levels'
@@ -1106,6 +1106,7 @@ export function registerIpcHandlers(sessionManager: SessionManager, windowManage
   // Get current API setup and credential status
   ipcMain.handle(IPC_CHANNELS.SETTINGS_GET_API_SETUP, async (): Promise<ApiSetupInfo> => {
     const authType = getAuthType()
+    const oauthProvider = authType === 'oauth_token' ? getOAuthProvider() : undefined
     const manager = getCredentialManager()
 
     let hasCredential = false
@@ -1120,11 +1121,14 @@ export function registerIpcHandlers(sessionManager: SessionManager, windowManage
       // Keyless providers (Ollama) are valid when a custom base URL is configured
       hasCredential = !!apiKey || !!anthropicBaseUrl
     } else if (authType === 'oauth_token') {
-      hasCredential = !!(await manager.getClaudeOAuth())
+      hasCredential = oauthProvider === 'openai'
+        ? !!(await manager.getOpenAIOAuth())
+        : !!(await manager.getClaudeOAuth())
     }
 
     return {
       authType,
+      oauthProvider,
       hasCredential,
       apiKey,
       anthropicBaseUrl,
@@ -1143,11 +1147,15 @@ export function registerIpcHandlers(sessionManager: SessionManager, windowManage
         await manager.delete({ type: 'anthropic_api_key' })
       } else if (oldAuthType === 'oauth_token') {
         await manager.delete({ type: 'claude_oauth' })
+        await manager.delete({ type: 'openai_oauth' })
       }
     }
 
     // Set new auth type
     setAuthType(authType)
+    if (authType === 'oauth_token') {
+      setOAuthProvider('claude')
+    }
 
     // Update Anthropic base URL (null to clear, undefined to keep unchanged)
     if (anthropicBaseUrl !== undefined) {
@@ -1194,6 +1202,7 @@ export function registerIpcHandlers(sessionManager: SessionManager, windowManage
           await manager.setClaudeOAuth(credential)
           ipcLog.info('Saved Claude OAuth access token only')
         }
+        setOAuthProvider('claude')
       }
     } else if (credential === '') {
       // Empty string means user explicitly cleared the credential
@@ -1201,8 +1210,14 @@ export function registerIpcHandlers(sessionManager: SessionManager, windowManage
         await manager.delete({ type: 'anthropic_api_key' })
         ipcLog.info('API key cleared')
       } else if (authType === 'oauth_token') {
-        await manager.delete({ type: 'claude_oauth' })
-        ipcLog.info('Claude OAuth cleared')
+        const provider = getOAuthProvider()
+        if (provider === 'openai') {
+          await manager.delete({ type: 'openai_oauth' })
+          ipcLog.info('OpenAI OAuth cleared')
+        } else {
+          await manager.delete({ type: 'claude_oauth' })
+          ipcLog.info('Claude OAuth cleared')
+        }
       }
     }
 

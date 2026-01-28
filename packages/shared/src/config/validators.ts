@@ -59,9 +59,11 @@ const WorkspaceSchema = z.object({
 });
 
 const AuthTypeSchema = z.enum(['api_key', 'oauth_token']);
+const OAuthProviderSchema = z.enum(['claude', 'openai']);
 
 export const StoredConfigSchema = z.object({
   authType: AuthTypeSchema.optional(),
+  oauthProvider: OAuthProviderSchema.optional(),
   workspaces: z.array(WorkspaceSchema).min(0),
   activeWorkspaceId: z.string().nullable(),
   activeSessionId: z.string().nullable(),

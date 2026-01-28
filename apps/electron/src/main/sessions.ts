@@ -738,12 +738,20 @@ export class SessionManager {
           process.env.ANTHROPIC_API_KEY = 'not-needed'
           sessionLog.warn('Custom base URL configured but no API key set. Using placeholder key (works for Ollama, will fail for OpenRouter).')
         }
-      } else if (billing.type === 'oauth_token' && billing.claudeOAuthToken) {
-        // Priority 2: Claude Max subscription via OAuth token (direct Anthropic only)
-        process.env.CLAUDE_CODE_OAUTH_TOKEN = billing.claudeOAuthToken
-        delete process.env.ANTHROPIC_API_KEY
-        delete process.env.ANTHROPIC_BASE_URL
-        sessionLog.info('Set Claude Max OAuth Token')
+      } else if (billing.type === 'oauth_token') {
+        if (billing.oauthProvider === 'openai' && billing.openaiOAuthToken) {
+          // OpenAI subscription OAuth - use bearer-style token against OpenAI API base
+          process.env.ANTHROPIC_BASE_URL = 'https://api.openai.com'
+          process.env.ANTHROPIC_API_KEY = billing.openaiOAuthToken
+          delete process.env.CLAUDE_CODE_OAUTH_TOKEN
+          sessionLog.info('Set OpenAI OAuth token (ChatGPT subscription)')
+        } else if (billing.claudeOAuthToken) {
+          // Priority 2: Claude Max subscription via OAuth token (direct Anthropic only)
+          process.env.CLAUDE_CODE_OAUTH_TOKEN = billing.claudeOAuthToken
+          delete process.env.ANTHROPIC_API_KEY
+          delete process.env.ANTHROPIC_BASE_URL
+          sessionLog.info('Set Claude Max OAuth Token')
+        }
       } else if (billing.apiKey) {
         // Priority 3: API key with default Anthropic endpoint
         process.env.ANTHROPIC_API_KEY = billing.apiKey

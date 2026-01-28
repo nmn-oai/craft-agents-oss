@@ -37,12 +37,16 @@ export interface AuthState {
   billing: {
     /** Configured billing type, or null if not yet configured */
     type: AuthType | null;
+    /** Which OAuth provider is active when type === 'oauth_token' */
+    oauthProvider: 'claude' | 'openai' | null;
     /** True if we have the required credentials for the configured billing type */
     hasCredentials: boolean;
     /** Anthropic API key (if using api_key auth type) */
     apiKey: string | null;
     /** Claude Max OAuth token (if using oauth_token auth type) */
     claudeOAuthToken: string | null;
+    /** OpenAI OAuth token (if using oauth_token auth type with oauthProvider=openai) */
+    openaiOAuthToken: string | null;
     /** Migration info if user needs to re-authenticate */
     migrationRequired?: MigrationInfo;
   };
@@ -228,7 +232,9 @@ export async function getAuthState(): Promise<AuthState> {
 
   const apiKey = await manager.getApiKey();
   const tokenResult = await getValidClaudeOAuthToken();
+  const openaiOAuthToken = await manager.getOpenAIOAuth();
   const activeWorkspace = getActiveWorkspace();
+  const oauthProvider = config?.oauthProvider ?? 'claude';
 
   // Determine if billing credentials are satisfied based on auth type
   let hasCredentials = false;
@@ -236,15 +242,19 @@ export async function getAuthState(): Promise<AuthState> {
     // Keyless providers (Ollama) are valid when a custom base URL is configured
     hasCredentials = !!apiKey || !!config?.anthropicBaseUrl;
   } else if (config?.authType === 'oauth_token') {
-    hasCredentials = !!tokenResult.accessToken;
+    hasCredentials = oauthProvider === 'openai'
+      ? !!openaiOAuthToken
+      : !!tokenResult.accessToken;
   }
 
   return {
     billing: {
       type: config?.authType ?? null,
+      oauthProvider: config?.authType === 'oauth_token' ? oauthProvider : null,
       hasCredentials,
       apiKey,
-      claudeOAuthToken: tokenResult.accessToken,
+      claudeOAuthToken: oauthProvider === 'claude' ? tokenResult.accessToken : null,
+      openaiOAuthToken: oauthProvider === 'openai' ? openaiOAuthToken : null,
       migrationRequired: tokenResult.migrationRequired,
     },
     workspace: {

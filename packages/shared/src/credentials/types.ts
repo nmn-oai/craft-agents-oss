@@ -18,8 +18,9 @@
 /** Types of credentials we store */
 export type CredentialType =
   // Global credentials
-  | 'anthropic_api_key'  // Anthropic API key for Claude
-  | 'claude_oauth'       // Claude OAuth token (Max subscription)
+ | 'anthropic_api_key'  // Anthropic API key for Claude
+ | 'claude_oauth'       // Claude OAuth token (Max subscription)
+ | 'openai_oauth'       // OpenAI OAuth token (ChatGPT subscription)
   // Workspace credentials
   | 'workspace_oauth'    // Workspace MCP OAuth token
   // Source credentials (stored at ~/.craft-agent/workspaces/{ws}/sources/{slug}/)
@@ -32,6 +33,7 @@ export type CredentialType =
 const VALID_CREDENTIAL_TYPES: readonly CredentialType[] = [
   'anthropic_api_key',
   'claude_oauth',
+  'openai_oauth',
   'workspace_oauth',
   'source_oauth',
   'source_bearer',

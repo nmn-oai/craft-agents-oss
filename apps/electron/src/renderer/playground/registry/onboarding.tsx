@@ -66,6 +66,7 @@ export const onboardingComponents: ComponentEntry[] = [
           type: 'select',
           options: [
             { label: 'None', value: '' },
+            { label: 'ChatGPT Subscription', value: 'chatgpt_subscription' },
             { label: 'Claude OAuth', value: 'claude_oauth' },
             { label: 'API Key', value: 'api_key' },
           ],
@@ -75,6 +76,7 @@ export const onboardingComponents: ComponentEntry[] = [
     ],
     variants: [
       { name: 'No Selection', props: { selectedMethod: null } },
+      { name: 'ChatGPT Subscription Selected', props: { selectedMethod: 'chatgpt_subscription' } },
       { name: 'Claude OAuth Selected', props: { selectedMethod: 'claude_oauth' } },
       { name: 'API Key Selected', props: { selectedMethod: 'api_key' } },
     ],
@@ -162,6 +164,16 @@ export const onboardingComponents: ComponentEntry[] = [
     variants: [
       { name: 'Idle', props: { apiSetupMethod: 'claude_oauth', status: 'idle' } },
       { name: 'Waiting for Code', props: { apiSetupMethod: 'claude_oauth', status: 'idle', isWaitingForCode: true } },
+      {
+        name: 'ChatGPT Device Flow',
+        props: {
+          apiSetupMethod: 'chatgpt_subscription',
+          oauthVariant: 'openai',
+          status: 'idle',
+          isWaitingForCode: true,
+          openAIDeviceCodeInfo: { verificationUrl: 'https://chat.openai.com', userCode: 'ABCD-1234' },
+        }
+      },
       { name: 'Waiting for Code - Validating', props: { apiSetupMethod: 'claude_oauth', status: 'validating', isWaitingForCode: true } },
       { name: 'Waiting for Code - Error', props: { apiSetupMethod: 'claude_oauth', status: 'error', isWaitingForCode: true, errorMessage: 'Invalid authorization code.' } },
       { name: 'Validating', props: { apiSetupMethod: 'claude_oauth', status: 'validating' } },
@@ -173,6 +185,8 @@ export const onboardingComponents: ComponentEntry[] = [
       onSubmit: (data: { apiKey: string }) => console.log('[Playground] Submitted:', data),
       onStartOAuth: noopHandler,
       onBack: noopHandler,
+      oauthVariant: 'claude',
+      openAIDeviceCodeInfo: null,
       onSubmitAuthCode: (code: string) => console.log('[Playground] Auth code:', code),
       onCancelOAuth: noopHandler,
     }),
@@ -298,9 +312,9 @@ export const onboardingComponents: ComponentEntry[] = [
         },
       },
       {
-        name: 'API Setup (Selected)',
+        name: 'API Setup (ChatGPT Default)',
         props: {
-          state: createOnboardingState({ step: 'api-setup', apiSetupMethod: 'claude_oauth' }),
+          state: createOnboardingState({ step: 'api-setup', apiSetupMethod: 'chatgpt_subscription' }),
         },
       },
       {

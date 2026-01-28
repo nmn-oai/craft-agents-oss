@@ -26,6 +26,8 @@ export interface OAuthConnectProps {
   errorMessage?: string
   /** Whether we're waiting for user to paste an auth code */
   isWaitingForCode?: boolean
+  /** Device-flow details (OpenAI OAuth) */
+  deviceCodeInfo?: { verificationUrl: string; userCode: string } | null
   /** Start the OAuth browser flow */
   onStartOAuth: () => void
   /** Submit the authorization code from the browser */
@@ -40,6 +42,7 @@ export function OAuthConnect({
   status,
   errorMessage,
   isWaitingForCode,
+  deviceCodeInfo,
   onSubmitAuthCode,
   formId = "auth-code-form",
 }: OAuthConnectProps) {
@@ -54,6 +57,33 @@ export function OAuthConnect({
 
   // Auth code entry form — shown when waiting for the user to paste the code
   if (isWaitingForCode) {
+    // Device flow display (no auth code entry required)
+    if (deviceCodeInfo) {
+      return (
+        <div className="space-y-3">
+          <div className="rounded-md bg-foreground-2 p-4 text-sm text-center shadow-minimal">
+            <p className="text-muted-foreground">Enter this code in your browser</p>
+            <p className="mt-2 font-mono text-lg tracking-widest">{deviceCodeInfo.userCode}</p>
+          </div>
+          <p className="text-xs text-muted-foreground text-center">
+            If the browser did not open, visit{' '}
+            <a
+              href={deviceCodeInfo.verificationUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline hover:text-foreground/70"
+            >
+              this verification page
+            </a>
+            .
+          </p>
+          {status === 'error' && errorMessage && (
+            <p className="text-sm text-destructive text-center">{errorMessage}</p>
+          )}
+        </div>
+      )
+    }
+
     return (
       <form id={formId} onSubmit={handleAuthCodeSubmit}>
         <div className="space-y-2">

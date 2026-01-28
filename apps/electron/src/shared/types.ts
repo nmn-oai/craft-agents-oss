@@ -570,6 +570,11 @@ export const IPC_CHANNELS = {
   ONBOARDING_EXCHANGE_CLAUDE_CODE: 'onboarding:exchangeClaudeCode',
   ONBOARDING_HAS_CLAUDE_OAUTH_STATE: 'onboarding:hasClaudeOAuthState',
   ONBOARDING_CLEAR_CLAUDE_OAUTH_STATE: 'onboarding:clearClaudeOAuthState',
+  // OpenAI OAuth (device flow)
+  ONBOARDING_START_OPENAI_OAUTH: 'onboarding:startOpenAIOAuth',
+  ONBOARDING_COMPLETE_OPENAI_OAUTH: 'onboarding:completeOpenAIOAuth',
+  ONBOARDING_HAS_OPENAI_OAUTH_STATE: 'onboarding:hasOpenAIOAuthState',
+  ONBOARDING_CLEAR_OPENAI_OAUTH_STATE: 'onboarding:clearOpenAIOAuthState',
 
   // Settings - API Setup
   SETTINGS_GET_API_SETUP: 'settings:getApiSetup',
@@ -795,6 +800,7 @@ export interface ElectronAPI {
   startWorkspaceMcpOAuth(mcpUrl: string): Promise<OAuthResult & { accessToken?: string; clientId?: string }>
   saveOnboardingConfig(config: {
     authType?: AuthType  // Optional - if not provided, preserves existing auth type (for add workspace)
+    oauthProvider?: 'claude' | 'openai'  // Which OAuth provider to use when authType === 'oauth_token'
     workspace?: { name: string; iconUrl?: string; mcpUrl?: string }  // Optional - if not provided, only updates billing
     credential?: string  // API key or OAuth token based on authType
     mcpCredentials?: { accessToken: string; clientId?: string }  // MCP OAuth credentials
@@ -806,6 +812,11 @@ export interface ElectronAPI {
   exchangeClaudeCode(code: string): Promise<ClaudeOAuthResult>
   hasClaudeOAuthState(): Promise<boolean>
   clearClaudeOAuthState(): Promise<{ success: boolean }>
+  // OpenAI OAuth (device flow)
+  startOpenAIOAuth(): Promise<{ success: boolean; verificationUrl?: string; userCode?: string; error?: string }>
+  completeOpenAIOAuth(): Promise<{ success: boolean; token?: string; error?: string }>
+  hasOpenAIOAuthState(): Promise<boolean>
+  clearOpenAIOAuthState(): Promise<{ success: boolean }>
 
   // Settings - API Setup
   getApiSetup(): Promise<ApiSetupInfo>
@@ -962,6 +973,7 @@ export interface ClaudeOAuthResult {
  */
 export interface ApiSetupInfo {
   authType: AuthType
+  oauthProvider?: 'claude' | 'openai'
   hasCredential: boolean
   apiKey?: string  // The stored API key (only returned for api_key auth type)
   anthropicBaseUrl?: string  // Custom Anthropic API base URL (for third-party compatible APIs)

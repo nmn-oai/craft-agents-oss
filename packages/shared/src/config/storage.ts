@@ -25,15 +25,17 @@ export type {
   Workspace,
   McpAuthType,
   AuthType,
+  OAuthProvider,
   OAuthCredentials,
 } from '@craft-agent/core/types';
 
 // Import for local use
-import type { Workspace, AuthType } from '@craft-agent/core/types';
+import type { Workspace, AuthType, OAuthProvider } from '@craft-agent/core/types';
 
 // Config stored in JSON file (credentials stored in encrypted file, not here)
 export interface StoredConfig {
   authType?: AuthType;
+  oauthProvider?: OAuthProvider;
   anthropicBaseUrl?: string;  // Custom Anthropic API base URL (for third-party compatible APIs)
   customModel?: string;  // Custom model ID override (for third-party APIs like OpenRouter, Ollama)
   workspaces: Workspace[];
@@ -205,6 +207,22 @@ export function setAuthType(authType: AuthType): void {
   const config = loadStoredConfig();
   if (!config) return;
   config.authType = authType;
+  if (authType !== 'oauth_token') {
+    delete config.oauthProvider;
+  }
+  saveConfig(config);
+}
+
+export function getOAuthProvider(): OAuthProvider {
+  const config = loadStoredConfig();
+  if (config?.oauthProvider) return config.oauthProvider;
+  return 'claude';
+}
+
+export function setOAuthProvider(oauthProvider: OAuthProvider): void {
+  const config = loadStoredConfig();
+  if (!config) return;
+  config.oauthProvider = oauthProvider;
   saveConfig(config);
 }
 

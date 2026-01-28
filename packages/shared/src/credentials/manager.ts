@@ -192,6 +192,17 @@ export class CredentialManager {
     await this.set({ type: 'claude_oauth' }, { value: token });
   }
 
+  /** Get OpenAI OAuth token */
+  async getOpenAIOAuth(): Promise<string | null> {
+    const cred = await this.get({ type: 'openai_oauth' });
+    return cred?.value || null;
+  }
+
+  /** Set OpenAI OAuth token */
+  async setOpenAIOAuth(token: string): Promise<void> {
+    await this.set({ type: 'openai_oauth' }, { value: token });
+  }
+
   /** Get Claude OAuth credentials (with refresh token, expiry, and source) */
   async getClaudeOAuthCredentials(): Promise<{
     accessToken: string;
