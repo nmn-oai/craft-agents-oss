@@ -570,6 +570,11 @@ export const IPC_CHANNELS = {
   ONBOARDING_EXCHANGE_CLAUDE_CODE: 'onboarding:exchangeClaudeCode',
   ONBOARDING_HAS_CLAUDE_OAUTH_STATE: 'onboarding:hasClaudeOAuthState',
   ONBOARDING_CLEAR_CLAUDE_OAUTH_STATE: 'onboarding:clearClaudeOAuthState',
+  // OpenAI OAuth (ChatGPT subscription)
+  ONBOARDING_START_OPENAI_OAUTH: 'onboarding:startOpenAIOAuth',
+  ONBOARDING_EXCHANGE_OPENAI_CODE: 'onboarding:exchangeOpenAICode',
+  ONBOARDING_HAS_OPENAI_OAUTH_STATE: 'onboarding:hasOpenAIOAuthState',
+  ONBOARDING_CLEAR_OPENAI_OAUTH_STATE: 'onboarding:clearOpenAIOAuthState',
 
   // Settings - API Setup
   SETTINGS_GET_API_SETUP: 'settings:getApiSetup',
@@ -964,6 +969,7 @@ export interface ApiSetupInfo {
   authType: AuthType
   hasCredential: boolean
   apiKey?: string  // The stored API key (only returned for api_key auth type)
+  openaiOAuthToken?: string  // Stored OpenAI OAuth token (ChatGPT subscription)
   anthropicBaseUrl?: string  // Custom Anthropic API base URL (for third-party compatible APIs)
   customModel?: string  // Custom model ID override (for third-party APIs)
 }

@@ -41,6 +41,12 @@ export interface ApiKeyInputProps {
   formId?: string
   /** Disable the input (e.g. during validation) */
   disabled?: boolean
+  /** Initial provider preset (defaults to Anthropic) */
+  initialPresetKey?: PresetKey
+  /** Initial custom model value */
+  initialCustomModel?: string
+  /** Placeholder text for API key input */
+  apiKeyPlaceholder?: string
 }
 
 type PresetKey = 'anthropic' | 'openrouter' | 'vercel' | 'ollama' | 'custom'
@@ -70,12 +76,16 @@ export function ApiKeyInput({
   onSubmit,
   formId = "api-key-form",
   disabled,
+  initialPresetKey = 'anthropic',
+  initialCustomModel,
+  apiKeyPlaceholder = 'sk-ant-...',
 }: ApiKeyInputProps) {
   const [apiKey, setApiKey] = useState('')
   const [showValue, setShowValue] = useState(false)
-  const [baseUrl, setBaseUrl] = useState(PRESETS[0].url)
-  const [activePreset, setActivePreset] = useState<PresetKey>('anthropic')
-  const [customModel, setCustomModel] = useState('')
+  const initialPreset = PRESETS.find(p => p.key === initialPresetKey) ?? PRESETS[0]
+  const [baseUrl, setBaseUrl] = useState(initialPreset.url)
+  const [activePreset, setActivePreset] = useState<PresetKey>(initialPreset.key)
+  const [customModel, setCustomModel] = useState(initialCustomModel ?? (initialPreset.key === 'ollama' ? 'qwen3-coder' : ''))
 
   const isDisabled = disabled || status === 'validating'
 
@@ -127,7 +137,7 @@ export function ApiKeyInput({
             type={showValue ? 'text' : 'password'}
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
-            placeholder="sk-ant-..."
+            placeholder={apiKeyPlaceholder}
             className={cn(
               "pr-10 border-0 bg-transparent shadow-none",
               status === 'error' && "focus-visible:ring-destructive"

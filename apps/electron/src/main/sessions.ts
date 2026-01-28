@@ -38,7 +38,7 @@ import {
 } from '@craft-agent/shared/sessions'
 import { loadWorkspaceSources, loadAllSources, getSourcesBySlugs, type LoadedSource, type McpServerConfig, getSourcesNeedingAuth, getSourceCredentialManager, getSourceServerBuilder, type SourceWithCredential, isApiOAuthProvider, SERVER_BUILD_ERRORS } from '@craft-agent/shared/sources'
 import { ConfigWatcher, type ConfigWatcherCallbacks } from '@craft-agent/shared/config'
-import { getAuthState } from '@craft-agent/shared/auth'
+import { getAuthState, OPENAI_ANTHROPIC_BASE_URL } from '@craft-agent/shared/auth'
 import { setAnthropicOptionsEnv, setPathToClaudeCodeExecutable, setInterceptorPath, setExecutable } from '@craft-agent/shared/agent'
 import { getCredentialManager } from '@craft-agent/shared/credentials'
 import { CraftMcpClient } from '@craft-agent/shared/mcp'
@@ -738,14 +738,21 @@ export class SessionManager {
           process.env.ANTHROPIC_API_KEY = 'not-needed'
           sessionLog.warn('Custom base URL configured but no API key set. Using placeholder key (works for Ollama, will fail for OpenRouter).')
         }
+      } else if (billing.openaiOAuthToken) {
+        // Priority 2: ChatGPT subscription via OpenAI OAuth token
+        // Uses OpenAI's Anthropic-compatible endpoint for the Claude Agent SDK.
+        process.env.ANTHROPIC_BASE_URL = OPENAI_ANTHROPIC_BASE_URL
+        process.env.ANTHROPIC_API_KEY = billing.openaiOAuthToken
+        delete process.env.CLAUDE_CODE_OAUTH_TOKEN
+        sessionLog.info('Set OpenAI OAuth token with Anthropic-compatible base URL')
       } else if (billing.type === 'oauth_token' && billing.claudeOAuthToken) {
-        // Priority 2: Claude Max subscription via OAuth token (direct Anthropic only)
+        // Priority 3: Claude Max subscription via OAuth token (direct Anthropic only)
         process.env.CLAUDE_CODE_OAUTH_TOKEN = billing.claudeOAuthToken
         delete process.env.ANTHROPIC_API_KEY
         delete process.env.ANTHROPIC_BASE_URL
         sessionLog.info('Set Claude Max OAuth Token')
       } else if (billing.apiKey) {
-        // Priority 3: API key with default Anthropic endpoint
+        // Priority 4: API key with default Anthropic endpoint
         process.env.ANTHROPIC_API_KEY = billing.apiKey
         delete process.env.CLAUDE_CODE_OAUTH_TOKEN
         delete process.env.ANTHROPIC_BASE_URL

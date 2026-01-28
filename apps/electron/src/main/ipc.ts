@@ -16,6 +16,7 @@ import { getSessionAttachmentsPath } from '@craft-agent/shared/sessions'
 import { loadWorkspaceSources, getSourcesBySlugs, type LoadedSource } from '@craft-agent/shared/sources'
 import { isValidThinkingLevel } from '@craft-agent/shared/agent/thinking-levels'
 import { getCredentialManager } from '@craft-agent/shared/credentials'
+import { OPENAI_ANTHROPIC_BASE_URL } from '@craft-agent/shared/auth'
 import { MarkItDown } from 'markitdown-js'
 
 /**
@@ -1110,15 +1111,17 @@ export function registerIpcHandlers(sessionManager: SessionManager, windowManage
 
     let hasCredential = false
     let apiKey: string | undefined
+    let openaiOAuthToken: string | undefined
     let anthropicBaseUrl: string | undefined
     let customModel: string | undefined
 
     if (authType === 'api_key') {
       apiKey = await manager.getApiKey() ?? undefined
+      openaiOAuthToken = (await manager.getOpenAIOAuthCredentials())?.accessToken ?? undefined
       anthropicBaseUrl = getAnthropicBaseUrl() ?? undefined
       customModel = getCustomModel() ?? undefined
       // Keyless providers (Ollama) are valid when a custom base URL is configured
-      hasCredential = !!apiKey || !!anthropicBaseUrl
+      hasCredential = !!apiKey || !!openaiOAuthToken || !!anthropicBaseUrl
     } else if (authType === 'oauth_token') {
       hasCredential = !!(await manager.getClaudeOAuth())
     }
@@ -1127,6 +1130,7 @@ export function registerIpcHandlers(sessionManager: SessionManager, windowManage
       authType,
       hasCredential,
       apiKey,
+      openaiOAuthToken,
       anthropicBaseUrl,
       customModel,
     }
@@ -1141,6 +1145,7 @@ export function registerIpcHandlers(sessionManager: SessionManager, windowManage
     if (oldAuthType !== authType) {
       if (oldAuthType === 'api_key') {
         await manager.delete({ type: 'anthropic_api_key' })
+        await manager.delete({ type: 'openai_oauth' })
       } else if (oldAuthType === 'oauth_token') {
         await manager.delete({ type: 'claude_oauth' })
       }
@@ -1177,7 +1182,16 @@ export function registerIpcHandlers(sessionManager: SessionManager, windowManage
     // Store or clear credential
     if (credential) {
       if (authType === 'api_key') {
-        await manager.setApiKey(credential)
+        const trimmedBaseUrl = anthropicBaseUrl?.trim() ?? getAnthropicBaseUrl() ?? ''
+        const isOpenAIOAuth = trimmedBaseUrl === OPENAI_ANTHROPIC_BASE_URL
+        if (isOpenAIOAuth) {
+          await manager.setOpenAIOAuthCredentials({ accessToken: credential })
+          await manager.delete({ type: 'anthropic_api_key' })
+          ipcLog.info('Saved OpenAI OAuth access token')
+        } else {
+          await manager.setApiKey(credential)
+          await manager.delete({ type: 'openai_oauth' })
+        }
       } else if (authType === 'oauth_token') {
         // Import full credentials including refresh token and expiry from Claude CLI
         const { getExistingClaudeCredentials } = await import('@craft-agent/shared/auth')
@@ -1199,6 +1213,7 @@ export function registerIpcHandlers(sessionManager: SessionManager, windowManage
       // Empty string means user explicitly cleared the credential
       if (authType === 'api_key') {
         await manager.delete({ type: 'anthropic_api_key' })
+        await manager.delete({ type: 'openai_oauth' })
         ipcLog.info('API key cleared')
       } else if (authType === 'oauth_token') {
         await manager.delete({ type: 'claude_oauth' })

@@ -227,6 +227,35 @@ export class CredentialManager {
     });
   }
 
+  /** Get OpenAI OAuth credentials (ChatGPT subscription) */
+  async getOpenAIOAuthCredentials(): Promise<{
+    accessToken: string;
+    refreshToken?: string;
+    expiresAt?: number;
+  } | null> {
+    const cred = await this.get({ type: 'openai_oauth' });
+    if (!cred) return null;
+    return {
+      accessToken: cred.value,
+      refreshToken: cred.refreshToken,
+      expiresAt: cred.expiresAt,
+    };
+  }
+
+  /** Set OpenAI OAuth credentials (ChatGPT subscription) */
+  async setOpenAIOAuthCredentials(credentials: {
+    accessToken: string;
+    refreshToken?: string;
+    expiresAt?: number;
+  }): Promise<void> {
+    await this.set({ type: 'openai_oauth' }, {
+      value: credentials.accessToken,
+      refreshToken: credentials.refreshToken,
+      expiresAt: credentials.expiresAt,
+      source: 'native',
+    });
+  }
+
   /** Get workspace MCP OAuth credentials */
   async getWorkspaceOAuth(workspaceId: string): Promise<{
     accessToken: string;
