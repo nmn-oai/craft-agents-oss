@@ -19,6 +19,7 @@ const OPENAI_CLIENT_ID = OPENAI_OAUTH_CONFIG.CLIENT_ID
 const OPENAI_AUTH_URL = OPENAI_OAUTH_CONFIG.AUTH_URL
 const OPENAI_TOKEN_URL = OPENAI_OAUTH_CONFIG.TOKEN_URL
 const REDIRECT_URI = OPENAI_OAUTH_CONFIG.REDIRECT_URI
+const OAUTH_AUDIENCE = OPENAI_OAUTH_CONFIG.AUDIENCE
 const OAUTH_SCOPES = OPENAI_OAUTH_CONFIG.SCOPES
 const STATE_EXPIRY_MS = 10 * 60 * 1000
 
@@ -68,7 +69,7 @@ async function listenForOpenAICallback(
   const redirectUrl = new URL(redirectUri)
   if (redirectUrl.protocol !== 'http:' || !isLoopbackHost(redirectUrl.hostname)) {
     throw new Error(
-      'OpenAI OAuth requires a loopback redirect URI (e.g. http://127.0.0.1:0/callback).'
+      'OpenAI OAuth requires a loopback redirect URI (e.g. http://127.0.0.1:14565/callback).'
     )
   }
 
@@ -189,6 +190,7 @@ export async function startOpenAIOAuth(
     client_id: OPENAI_CLIENT_ID,
     response_type: 'code',
     redirect_uri: loopbackListener.redirectUri,
+    audience: OAUTH_AUDIENCE,
     scope: OAUTH_SCOPES,
     code_challenge: codeChallenge,
     code_challenge_method: 'S256',

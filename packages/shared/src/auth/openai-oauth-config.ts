@@ -16,7 +16,8 @@ function getEnv(name: string, fallback: string): string {
  * This is a public OAuth client identifier (no secret).
  */
 const DEFAULT_OPENAI_OAUTH_CLIENT_ID = 'codex';
-const DEFAULT_OPENAI_OAUTH_REDIRECT_URI = 'http://127.0.0.1:0/callback';
+const DEFAULT_OPENAI_OAUTH_REDIRECT_URI = 'http://127.0.0.1:14565/callback';
+const DEFAULT_OPENAI_OAUTH_AUDIENCE = 'https://api.openai.com/v1';
 
 /** Anthropic-compatible OpenAI endpoint used by the Claude Agent SDK. */
 export const OPENAI_ANTHROPIC_BASE_URL = getEnv(
@@ -29,6 +30,7 @@ export const OPENAI_OAUTH_CONFIG = {
   AUTH_URL: getEnv('OPENAI_OAUTH_AUTH_URL', 'https://auth.openai.com/oauth/authorize'),
   TOKEN_URL: getEnv('OPENAI_OAUTH_TOKEN_URL', 'https://auth.openai.com/oauth/token'),
   REDIRECT_URI: getEnv('OPENAI_OAUTH_REDIRECT_URI', DEFAULT_OPENAI_OAUTH_REDIRECT_URI),
+  AUDIENCE: getEnv('OPENAI_OAUTH_AUDIENCE', DEFAULT_OPENAI_OAUTH_AUDIENCE),
   SCOPES: getEnv('OPENAI_OAUTH_SCOPES', 'openid profile email offline_access'),
 } as const;
 
