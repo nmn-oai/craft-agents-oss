@@ -811,6 +811,11 @@ export interface ElectronAPI {
   exchangeClaudeCode(code: string): Promise<ClaudeOAuthResult>
   hasClaudeOAuthState(): Promise<boolean>
   clearClaudeOAuthState(): Promise<{ success: boolean }>
+  // OpenAI OAuth (ChatGPT subscription)
+  startOpenAIOAuth(): Promise<OpenAIOAuthResult>
+  exchangeOpenAICode(code: string): Promise<OpenAIOAuthResult>
+  hasOpenAIOAuthState(): Promise<boolean>
+  clearOpenAIOAuthState(): Promise<{ success: boolean }>
 
   // Settings - API Setup
   getApiSetup(): Promise<ApiSetupInfo>
@@ -959,6 +964,18 @@ export interface ElectronAPI {
 export interface ClaudeOAuthResult {
   success: boolean
   token?: string
+  error?: string
+}
+
+/**
+ * Result from OpenAI OAuth (ChatGPT subscription) flow
+ */
+export interface OpenAIOAuthResult {
+  success: boolean
+  token?: string
+  authUrl?: string
+  anthropicBaseUrl?: string
+  customModel?: string
   error?: string
 }
 

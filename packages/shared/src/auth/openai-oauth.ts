@@ -5,6 +5,8 @@
  * it can be aligned with OpenAI's current OAuth endpoints and client IDs.
  */
 import { randomBytes, createHash } from 'node:crypto'
+import { createServer } from 'node:http'
+import type { AddressInfo } from 'node:net'
 import { OPENAI_OAUTH_CONFIG, assertOpenAIOAuthConfigured } from './openai-oauth-config.ts'
 
 async function openUrl(url: string): Promise<void> {
@@ -32,6 +34,7 @@ export interface OpenAIOAuthState {
   codeVerifier: string
   timestamp: number
   expiresAt: number
+  redirectUri: string
 }
 
 let currentOAuthState: OpenAIOAuthState | null = null
@@ -48,14 +51,130 @@ function generatePKCE(): { codeVerifier: string; codeChallenge: string } {
   return { codeVerifier, codeChallenge }
 }
 
+export interface OpenAIOAuthStartResult {
+  authUrl: string
+  tokens?: OpenAITokens
+}
+
+function isLoopbackHost(hostname: string): boolean {
+  return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1'
+}
+
+async function listenForOpenAICallback(
+  redirectUri: string,
+  expectedState: string,
+  onStatus?: (message: string) => void
+): Promise<{ redirectUri: string; codePromise: Promise<string> }> {
+  const redirectUrl = new URL(redirectUri)
+  if (redirectUrl.protocol !== 'http:' || !isLoopbackHost(redirectUrl.hostname)) {
+    throw new Error(
+      'OpenAI OAuth requires a loopback redirect URI (e.g. http://127.0.0.1:0/callback).'
+    )
+  }
+
+  const desiredPort = redirectUrl.port ? Number(redirectUrl.port) : 0
+  let resolvedRedirectUri = redirectUrl.toString()
+  let timeout: NodeJS.Timeout | null = null
+  let resolveCode!: (code: string) => void
+  let rejectCode!: (error: Error) => void
+
+  const codePromise = new Promise<string>((resolve, reject) => {
+    resolveCode = resolve
+    rejectCode = reject
+  })
+
+  const server = createServer((req, res) => {
+    const requestUrl = new URL(req.url ?? '/', redirectUrl)
+    if (requestUrl.pathname !== redirectUrl.pathname) {
+      res.writeHead(404)
+      res.end('Not Found')
+      return
+    }
+
+    const error = requestUrl.searchParams.get('error')
+    const errorDescription = requestUrl.searchParams.get('error_description')
+    if (error) {
+      res.writeHead(400, { 'Content-Type': 'text/plain' })
+      res.end(errorDescription ? `${error}: ${errorDescription}` : error)
+      rejectCode(new Error(errorDescription || error))
+      server.close()
+      return
+    }
+
+    const code = requestUrl.searchParams.get('code')
+    const returnedState = requestUrl.searchParams.get('state')
+
+    if (!code) {
+      res.writeHead(400, { 'Content-Type': 'text/plain' })
+      res.end('Missing authorization code.')
+      rejectCode(new Error('OpenAI OAuth callback missing authorization code.'))
+      server.close()
+      return
+    }
+
+    if (returnedState !== expectedState) {
+      res.writeHead(400, { 'Content-Type': 'text/plain' })
+      res.end('State mismatch.')
+      rejectCode(new Error('OpenAI OAuth state mismatch.'))
+      server.close()
+      return
+    }
+
+    res.writeHead(200, { 'Content-Type': 'text/html' })
+    res.end(
+      '<!doctype html><html><head><meta charset="utf-8"/><title>Authentication Complete</title></head>' +
+        '<body><h1>Authentication complete</h1><p>You can return to Craft.</p></body></html>'
+    )
+    resolveCode(code)
+    server.close()
+  })
+
+  const listenPromise = new Promise<void>((resolve, reject) => {
+    server.on('error', (error) => {
+      reject(error)
+    })
+
+    server.listen(desiredPort, redirectUrl.hostname, () => {
+      const address = server.address() as AddressInfo | null
+      if (!address) {
+        reject(new Error('Failed to start OAuth callback server.'))
+        server.close()
+        return
+      }
+
+      const actualRedirect = new URL(redirectUrl.toString())
+      actualRedirect.port = String(address.port)
+      redirectUrl.port = String(address.port)
+      resolvedRedirectUri = actualRedirect.toString()
+      onStatus?.(`Listening for OpenAI OAuth callback on ${resolvedRedirectUri}...`)
+      resolve()
+    })
+  })
+
+  await listenPromise
+
+  timeout = setTimeout(() => {
+    rejectCode(new Error('OpenAI OAuth timed out waiting for callback.'))
+    server.close()
+  }, STATE_EXPIRY_MS)
+
+  codePromise.finally(() => {
+    if (timeout) clearTimeout(timeout)
+  })
+
+  return { redirectUri: resolvedRedirectUri, codePromise }
+}
+
 export async function startOpenAIOAuth(
   onStatus?: (message: string) => void
-): Promise<string> {
+): Promise<OpenAIOAuthStartResult> {
   assertOpenAIOAuthConfigured()
   onStatus?.('Generating OpenAI authentication URL...')
 
   const state = generateState()
   const { codeVerifier, codeChallenge } = generatePKCE()
+
+  const loopbackListener = await listenForOpenAICallback(REDIRECT_URI, state, onStatus)
 
   const now = Date.now()
   currentOAuthState = {
@@ -63,12 +182,13 @@ export async function startOpenAIOAuth(
     codeVerifier,
     timestamp: now,
     expiresAt: now + STATE_EXPIRY_MS,
+    redirectUri: loopbackListener.redirectUri,
   }
 
   const params = new URLSearchParams({
     client_id: OPENAI_CLIENT_ID,
     response_type: 'code',
-    redirect_uri: REDIRECT_URI,
+    redirect_uri: loopbackListener.redirectUri,
     scope: OAUTH_SCOPES,
     code_challenge: codeChallenge,
     code_challenge_method: 'S256',
@@ -79,9 +199,13 @@ export async function startOpenAIOAuth(
 
   onStatus?.('Opening browser for OpenAI authentication...')
   await openUrl(authUrl)
-  onStatus?.('Waiting for you to copy the authorization code...')
 
-  return authUrl
+  onStatus?.('Waiting for OpenAI authentication to complete...')
+
+  const authorizationCode = await loopbackListener.codePromise
+  const tokens = await exchangeOpenAICode(authorizationCode, onStatus)
+
+  return { authUrl, tokens }
 }
 
 export function hasValidOpenAIOAuthState(): boolean {
@@ -116,7 +240,7 @@ export async function exchangeOpenAICode(
     grant_type: 'authorization_code',
     client_id: OPENAI_CLIENT_ID,
     code: cleanedCode,
-    redirect_uri: REDIRECT_URI,
+    redirect_uri: currentOAuthState.redirectUri,
     code_verifier: currentOAuthState.codeVerifier,
   }
 

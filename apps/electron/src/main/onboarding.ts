@@ -319,17 +319,37 @@ export function registerOnboardingHandlers(sessionManager: SessionManager): void
     return { success: true }
   })
 
-  // Start OpenAI OAuth flow (opens browser, returns URL)
+  // Start OpenAI OAuth flow (opens browser, completes via loopback redirect)
   ipcMain.handle(IPC_CHANNELS.ONBOARDING_START_OPENAI_OAUTH, async () => {
     try {
       mainLog.info('[Onboarding] Starting OpenAI OAuth flow...')
 
-      const authUrl = await startOpenAIOAuth((status) => {
+      const { authUrl, tokens } = await startOpenAIOAuth((status) => {
         mainLog.info('[Onboarding] OpenAI OAuth status:', status)
       })
 
-      mainLog.info('[Onboarding] OpenAI OAuth URL generated, browser opened')
-      return { success: true, authUrl }
+      if (!tokens) {
+        return { success: false, error: 'OpenAI OAuth did not return tokens. Please try again.' }
+      }
+
+      const manager = getCredentialManagerFn()
+      await manager.setOpenAIOAuthCredentials({
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+        expiresAt: tokens.expiresAt,
+      })
+      // Ensure Anthropic API key is cleared when using OpenAI OAuth
+      await manager.delete({ type: 'anthropic_api_key' })
+
+      const expiresAtDate = tokens.expiresAt ? new Date(tokens.expiresAt).toISOString() : 'never'
+      mainLog.info(`[Onboarding] OpenAI OAuth successful (expires: ${expiresAtDate})`)
+      return {
+        success: true,
+        authUrl,
+        token: tokens.accessToken,
+        anthropicBaseUrl: OPENAI_ANTHROPIC_BASE_URL,
+        customModel: 'openai/gpt-5',
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error'
       mainLog.error('[Onboarding] Start OpenAI OAuth error:', message)
