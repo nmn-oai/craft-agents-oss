@@ -4,7 +4,7 @@
  * Mirrors the Claude OAuth flow but is fully configurable via env vars so
  * it can be aligned with OpenAI's current OAuth endpoints and client IDs.
  */
-import { randomBytes, createHash } from 'node:crypto'
+import { randomBytes, createHash, randomUUID } from 'node:crypto'
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { OPENAI_OAUTH_CONFIG, assertOpenAIOAuthConfigured } from './openai-oauth-config.ts'
@@ -42,6 +42,10 @@ let currentOAuthState: OpenAIOAuthState | null = null
 
 function generateState(): string {
   return randomBytes(32).toString('hex')
+}
+
+function generateSessionId(): string {
+  return typeof randomUUID === 'function' ? randomUUID() : randomBytes(16).toString('hex')
 }
 
 function generatePKCE(): { codeVerifier: string; codeChallenge: string } {
@@ -173,6 +177,7 @@ export async function startOpenAIOAuth(
   onStatus?.('Generating OpenAI authentication URL...')
 
   const state = generateState()
+  const sessionId = generateSessionId()
   const { codeVerifier, codeChallenge } = generatePKCE()
 
   const loopbackListener = await listenForOpenAICallback(REDIRECT_URI, state, onStatus)
@@ -190,6 +195,7 @@ export async function startOpenAIOAuth(
     client_id: OPENAI_CLIENT_ID,
     response_type: 'code',
     redirect_uri: loopbackListener.redirectUri,
+    session_id: sessionId,
     audience: OAUTH_AUDIENCE,
     scope: OAUTH_SCOPES,
     code_challenge: codeChallenge,
