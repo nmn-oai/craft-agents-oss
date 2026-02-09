@@ -5,8 +5,8 @@
  * Flow:
  * 1. Welcome
  * 2. Git Bash (Windows only, if not found)
- * 3. API Setup (API Key / Claude OAuth)
- * 4. Credentials (API Key or Claude OAuth)
+ * 3. API Setup (ChatGPT subscription / API Key / Claude OAuth)
+ * 4. Credentials (API Key-style config or Claude OAuth)
  * 5. Complete
  */
 import { useState, useCallback, useEffect } from 'react'
@@ -73,6 +73,8 @@ function apiSetupMethodToAuthType(method: ApiSetupMethod): AuthType {
   switch (method) {
     case 'api_key': return 'api_key'
     case 'claude_oauth': return 'oauth_token'
+    case 'chatgpt_subscription': return 'api_key'
+    default: return 'api_key'
   }
 }
 
@@ -89,7 +91,7 @@ export function useOnboarding({
     loginStatus: 'idle',
     credentialStatus: 'idle',
     completionStatus: 'saving',
-    apiSetupMethod: null,
+    apiSetupMethod: 'chatgpt_subscription',
     isExistingUser: initialSetupNeeds?.needsBillingConfig ?? false,
     gitBashStatus: undefined,
     isRecheckingGitBash: false,
@@ -260,22 +262,46 @@ export function useOnboarding({
         errorMessage: error instanceof Error ? error.message : 'Validation failed',
       }))
     }
-  }, [handleSaveConfig])
+  }, [handleSaveConfig, state.apiSetupMethod])
 
-  // Two-step OAuth flow state
+  // Two-step OAuth flow state (Claude only)
   const [isWaitingForCode, setIsWaitingForCode] = useState(false)
 
-  // Start Claude OAuth (native browser-based OAuth with PKCE - two-step flow)
+  // Start OAuth (Claude or OpenAI based on selected method)
   const handleStartOAuth = useCallback(async () => {
-    setState(s => ({ ...s, errorMessage: undefined }))
+    setState(s => ({ ...s, credentialStatus: 'validating', errorMessage: undefined }))
+    setIsWaitingForCode(false)
 
     try {
-      // Start OAuth flow - this opens the browser
+      if (state.apiSetupMethod === 'chatgpt_subscription') {
+        const result = await window.electronAPI.startOpenAIOAuth()
+        if (result.success && result.token) {
+          const baseUrl = result.anthropicBaseUrl as string | undefined
+          const customModel = result.customModel as string | undefined
+          await handleSaveConfig(result.token, { baseUrl, customModel })
+
+          setState(s => ({
+            ...s,
+            credentialStatus: 'success',
+            step: 'complete',
+          }))
+          return
+        }
+
+        setState(s => ({
+          ...s,
+          credentialStatus: 'error',
+          errorMessage: result.error || 'Failed to complete OpenAI OAuth',
+        }))
+        return
+      }
+
       const result = await window.electronAPI.startClaudeOAuth()
 
       if (result.success) {
         // Browser opened successfully, now waiting for user to copy the code
         setIsWaitingForCode(true)
+        setState(s => ({ ...s, credentialStatus: 'idle' }))
       } else {
         setState(s => ({
           ...s,
@@ -290,7 +316,7 @@ export function useOnboarding({
         errorMessage: error instanceof Error ? error.message : 'OAuth failed',
       }))
     }
-  }, [])
+  }, [handleSaveConfig, state.apiSetupMethod])
 
   // Submit authorization code (second step of OAuth flow)
   const handleSubmitAuthCode = useCallback(async (code: string) => {
@@ -305,12 +331,23 @@ export function useOnboarding({
 
     setState(s => ({ ...s, credentialStatus: 'validating', errorMessage: undefined }))
 
+    if (state.apiSetupMethod === 'chatgpt_subscription') {
+      setState(s => ({
+        ...s,
+        credentialStatus: 'error',
+        errorMessage: 'OpenAI OAuth completes automatically. Please try signing in again.',
+      }))
+      return
+    }
+
     try {
       const result = await window.electronAPI.exchangeClaudeCode(code.trim())
 
       if (result.success && result.token) {
         setIsWaitingForCode(false)
-        await handleSaveConfig(result.token)
+        const baseUrl = result.anthropicBaseUrl as string | undefined
+        const customModel = result.customModel as string | undefined
+        await handleSaveConfig(result.token, { baseUrl, customModel })
 
         setState(s => ({
           ...s,
@@ -331,15 +368,19 @@ export function useOnboarding({
         errorMessage: error instanceof Error ? error.message : 'Failed to exchange code',
       }))
     }
-  }, [handleSaveConfig])
+  }, [handleSaveConfig, state.apiSetupMethod])
 
   // Cancel OAuth flow
   const handleCancelOAuth = useCallback(async () => {
     setIsWaitingForCode(false)
     setState(s => ({ ...s, credentialStatus: 'idle', errorMessage: undefined }))
     // Clear OAuth state on backend
-    await window.electronAPI.clearClaudeOAuthState()
-  }, [])
+    if (state.apiSetupMethod === 'chatgpt_subscription') {
+      await window.electronAPI.clearOpenAIOAuthState()
+    } else {
+      await window.electronAPI.clearClaudeOAuthState()
+    }
+  }, [state.apiSetupMethod])
 
   // Git Bash handlers (Windows only)
   const handleBrowseGitBash = useCallback(async () => {
@@ -401,7 +442,7 @@ export function useOnboarding({
       loginStatus: 'idle',
       credentialStatus: 'idle',
       completionStatus: 'saving',
-      apiSetupMethod: null,
+      apiSetupMethod: 'chatgpt_subscription',
       isExistingUser: false,
       errorMessage: undefined,
     })

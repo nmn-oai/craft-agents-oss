@@ -161,6 +161,11 @@ const api: ElectronAPI = {
   exchangeClaudeCode: (code: string) => ipcRenderer.invoke(IPC_CHANNELS.ONBOARDING_EXCHANGE_CLAUDE_CODE, code),
   hasClaudeOAuthState: () => ipcRenderer.invoke(IPC_CHANNELS.ONBOARDING_HAS_CLAUDE_OAUTH_STATE),
   clearClaudeOAuthState: () => ipcRenderer.invoke(IPC_CHANNELS.ONBOARDING_CLEAR_CLAUDE_OAUTH_STATE),
+  // OpenAI OAuth (ChatGPT subscription)
+  startOpenAIOAuth: () => ipcRenderer.invoke(IPC_CHANNELS.ONBOARDING_START_OPENAI_OAUTH),
+  exchangeOpenAICode: (code: string) => ipcRenderer.invoke(IPC_CHANNELS.ONBOARDING_EXCHANGE_OPENAI_CODE, code),
+  hasOpenAIOAuthState: () => ipcRenderer.invoke(IPC_CHANNELS.ONBOARDING_HAS_OPENAI_OAUTH_STATE),
+  clearOpenAIOAuthState: () => ipcRenderer.invoke(IPC_CHANNELS.ONBOARDING_CLEAR_OPENAI_OAUTH_STATE),
 
   // Settings - API Setup
   getApiSetup: () => ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_GET_API_SETUP),

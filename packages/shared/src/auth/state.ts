@@ -14,6 +14,7 @@
 import { getCredentialManager } from '../credentials/index.ts';
 import { loadStoredConfig, getActiveWorkspace, type AuthType, type Workspace } from '../config/storage.ts';
 import { refreshClaudeToken, isTokenExpired } from './claude-token.ts';
+import { getValidOpenAIOAuthToken } from './openai-token.ts';
 import { debug } from '../utils/debug.ts';
 
 // ============================================
@@ -43,6 +44,8 @@ export interface AuthState {
     apiKey: string | null;
     /** Claude Max OAuth token (if using oauth_token auth type) */
     claudeOAuthToken: string | null;
+    /** OpenAI OAuth token (ChatGPT subscription) */
+    openaiOAuthToken: string | null;
     /** Migration info if user needs to re-authenticate */
     migrationRequired?: MigrationInfo;
   };
@@ -227,16 +230,18 @@ export async function getAuthState(): Promise<AuthState> {
   const manager = getCredentialManager();
 
   const apiKey = await manager.getApiKey();
-  const tokenResult = await getValidClaudeOAuthToken();
+  const claudeTokenResult = await getValidClaudeOAuthToken();
+  const openaiTokenResult = await getValidOpenAIOAuthToken();
   const activeWorkspace = getActiveWorkspace();
 
   // Determine if billing credentials are satisfied based on auth type
   let hasCredentials = false;
   if (config?.authType === 'api_key') {
     // Keyless providers (Ollama) are valid when a custom base URL is configured
-    hasCredentials = !!apiKey || !!config?.anthropicBaseUrl;
+    // OpenAI OAuth tokens are also valid API-key-style credentials.
+    hasCredentials = !!apiKey || !!openaiTokenResult.accessToken || !!config?.anthropicBaseUrl;
   } else if (config?.authType === 'oauth_token') {
-    hasCredentials = !!tokenResult.accessToken;
+    hasCredentials = !!claudeTokenResult.accessToken;
   }
 
   return {
@@ -244,8 +249,9 @@ export async function getAuthState(): Promise<AuthState> {
       type: config?.authType ?? null,
       hasCredentials,
       apiKey,
-      claudeOAuthToken: tokenResult.accessToken,
-      migrationRequired: tokenResult.migrationRequired,
+      claudeOAuthToken: claudeTokenResult.accessToken,
+      openaiOAuthToken: openaiTokenResult.accessToken,
+      migrationRequired: claudeTokenResult.migrationRequired,
     },
     workspace: {
       hasWorkspace: !!activeWorkspace,

@@ -11,7 +11,7 @@ import { saveConfig, loadStoredConfig, generateWorkspaceId, type AuthType, type 
 import { getDefaultWorkspacesDir, generateUniqueWorkspacePath } from '@craft-agent/shared/workspaces'
 import { CraftOAuth, getMcpBaseUrl } from '@craft-agent/shared/auth'
 import { validateMcpConnection } from '@craft-agent/shared/mcp'
-import { startClaudeOAuth, exchangeClaudeCode, hasValidOAuthState, clearOAuthState } from '@craft-agent/shared/auth'
+import { startClaudeOAuth, exchangeClaudeCode, hasValidOAuthState, clearOAuthState, startOpenAIOAuth, exchangeOpenAICode, hasValidOpenAIOAuthState, clearOpenAIOAuthState, OPENAI_ANTHROPIC_BASE_URL } from '@craft-agent/shared/auth'
 import { getCredentialManager as getCredentialManagerFn } from '@craft-agent/shared/credentials'
 import {
   IPC_CHANNELS,
@@ -105,9 +105,18 @@ export function registerOnboardingHandlers(sessionManager: SessionManager): void
       if (config.credential && config.authType) {
         mainLog.info('[Onboarding:Main] Saving credential for authType:', config.authType)
         if (config.authType === 'api_key') {
-          mainLog.info('[Onboarding:Main] Calling manager.setApiKey...')
-          await manager.setApiKey(config.credential)
-          mainLog.info('[Onboarding:Main] API key saved successfully')
+          const isOpenAIOAuth = (config.anthropicBaseUrl ?? '').trim() === OPENAI_ANTHROPIC_BASE_URL
+          if (isOpenAIOAuth) {
+            mainLog.info('[Onboarding:Main] Saving OpenAI OAuth credential...')
+            await manager.setOpenAIOAuthCredentials({ accessToken: config.credential })
+            await manager.delete({ type: 'anthropic_api_key' })
+            mainLog.info('[Onboarding:Main] OpenAI OAuth credential saved successfully')
+          } else {
+            mainLog.info('[Onboarding:Main] Calling manager.setApiKey...')
+            await manager.setApiKey(config.credential)
+            await manager.delete({ type: 'openai_oauth' })
+            mainLog.info('[Onboarding:Main] API key saved successfully')
+          }
         } else if (config.authType === 'oauth_token') {
           // NOTE: For oauth_token, credentials are saved via ONBOARDING_EXCHANGE_CLAUDE_CODE
           // which marks them with source: 'native'. We no longer import from Claude CLI.
@@ -307,6 +316,93 @@ export function registerOnboardingHandlers(sessionManager: SessionManager): void
   // Clear OAuth state (for cancel/reset)
   ipcMain.handle(IPC_CHANNELS.ONBOARDING_CLEAR_CLAUDE_OAUTH_STATE, async () => {
     clearOAuthState()
+    return { success: true }
+  })
+
+  // Start OpenAI OAuth flow (opens browser, completes via loopback redirect)
+  ipcMain.handle(IPC_CHANNELS.ONBOARDING_START_OPENAI_OAUTH, async () => {
+    try {
+      mainLog.info('[Onboarding] Starting OpenAI OAuth flow...')
+
+      const { authUrl, tokens } = await startOpenAIOAuth((status) => {
+        mainLog.info('[Onboarding] OpenAI OAuth status:', status)
+      })
+
+      if (!tokens) {
+        return { success: false, error: 'OpenAI OAuth did not return tokens. Please try again.' }
+      }
+
+      const manager = getCredentialManagerFn()
+      await manager.setOpenAIOAuthCredentials({
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+        expiresAt: tokens.expiresAt,
+      })
+      // Ensure Anthropic API key is cleared when using OpenAI OAuth
+      await manager.delete({ type: 'anthropic_api_key' })
+
+      const expiresAtDate = tokens.expiresAt ? new Date(tokens.expiresAt).toISOString() : 'never'
+      mainLog.info(`[Onboarding] OpenAI OAuth successful (expires: ${expiresAtDate})`)
+      return {
+        success: true,
+        authUrl,
+        token: tokens.accessToken,
+        anthropicBaseUrl: OPENAI_ANTHROPIC_BASE_URL,
+        customModel: 'openai/gpt-5',
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error'
+      mainLog.error('[Onboarding] Start OpenAI OAuth error:', message)
+      return { success: false, error: message }
+    }
+  })
+
+  // Exchange OpenAI authorization code for tokens
+  ipcMain.handle(IPC_CHANNELS.ONBOARDING_EXCHANGE_OPENAI_CODE, async (_event, authorizationCode: string) => {
+    try {
+      mainLog.info('[Onboarding] Exchanging OpenAI authorization code...')
+
+      if (!hasValidOpenAIOAuthState()) {
+        mainLog.error('[Onboarding] No valid OpenAI OAuth state found')
+        return { success: false, error: 'OAuth session expired. Please start again.' }
+      }
+
+      const tokens = await exchangeOpenAICode(authorizationCode, (status) => {
+        mainLog.info('[Onboarding] OpenAI code exchange status:', status)
+      })
+
+      const manager = getCredentialManagerFn()
+      await manager.setOpenAIOAuthCredentials({
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+        expiresAt: tokens.expiresAt,
+      })
+      // Ensure Anthropic API key is cleared when using OpenAI OAuth
+      await manager.delete({ type: 'anthropic_api_key' })
+
+      const expiresAtDate = tokens.expiresAt ? new Date(tokens.expiresAt).toISOString() : 'never'
+      mainLog.info(`[Onboarding] OpenAI OAuth successful (expires: ${expiresAtDate})`)
+      return {
+        success: true,
+        token: tokens.accessToken,
+        anthropicBaseUrl: OPENAI_ANTHROPIC_BASE_URL,
+        customModel: 'openai/gpt-5',
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error'
+      mainLog.error('[Onboarding] Exchange OpenAI code error:', message)
+      return { success: false, error: message }
+    }
+  })
+
+  // Check if there's a valid OpenAI OAuth state in progress
+  ipcMain.handle(IPC_CHANNELS.ONBOARDING_HAS_OPENAI_OAUTH_STATE, async () => {
+    return hasValidOpenAIOAuthState()
+  })
+
+  // Clear OpenAI OAuth state (for cancel/reset)
+  ipcMain.handle(IPC_CHANNELS.ONBOARDING_CLEAR_OPENAI_OAUTH_STATE, async () => {
+    clearOpenAIOAuthState()
     return { success: true }
   })
 }

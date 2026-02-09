@@ -42,7 +42,10 @@ export function CredentialsStep({
   onSubmitAuthCode,
   onCancelOAuth,
 }: CredentialsStepProps) {
-  const isOAuth = apiSetupMethod === 'claude_oauth'
+  const isChatGptSubscription = apiSetupMethod === 'chatgpt_subscription'
+  const isOAuth = apiSetupMethod === 'claude_oauth' || isChatGptSubscription
+  const providerLabel = isChatGptSubscription ? 'OpenAI' : 'Claude'
+  const providerSubscription = isChatGptSubscription ? 'ChatGPT subscription' : 'Claude subscription'
 
   // --- OAuth flow ---
   if (isOAuth) {
@@ -51,7 +54,7 @@ export function CredentialsStep({
       return (
         <StepFormLayout
           title="Enter Authorization Code"
-          description="Copy the code from the browser page and paste it below."
+          description={`Copy the ${providerLabel} code from the browser page and paste it below.`}
           actions={
             <>
               <BackButton onClick={onCancelOAuth} disabled={status === 'validating'}>Cancel</BackButton>
@@ -79,8 +82,8 @@ export function CredentialsStep({
 
     return (
       <StepFormLayout
-        title="Connect Claude Account"
-        description="Use your Claude subscription to power multi-agent workflows."
+        title={`Connect ${providerLabel} Account`}
+        description={`Use your ${providerSubscription} to power multi-agent workflows.`}
         actions={
           <>
             <BackButton onClick={onBack} disabled={status === 'validating'} />
@@ -91,7 +94,7 @@ export function CredentialsStep({
               loadingText="Connecting..."
             >
               <ExternalLink className="size-4" />
-              Sign in with Claude
+              {`Sign in with ${providerLabel}`}
             </ContinueButton>
           </>
         }
